@@ -18,15 +18,17 @@ from src.rag import search_store_policies
 def tool_search_catalog(
     query: Optional[str] = None,
     category: Optional[str] = None,
+    string_type: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     in_stock_only: bool = True,
     limit: int = 5,
 ) -> Dict[str, Any]:
-    """Search instruments in the store catalog with category, price, and stock filters."""
+    """Search instruments in the store catalog with category, price, stock, and string type filters."""
     results = search_products(
         query=query,
         category_name=category,
+        string_type=string_type,
         min_price=min_price,
         max_price=max_price,
         in_stock_only=in_stock_only,
@@ -164,7 +166,7 @@ OPENAI_TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "search_catalog",
-            "description": "Busca instrumentos musicais no catálogo da Empório da Música por palavra-chave, categoria, faixa de preço e estoque.",
+            "description": "Busca instrumentos musicais no catálogo da Empório da Música por palavra-chave, categoria, tipo de corda, faixa de preço e estoque.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -176,13 +178,17 @@ OPENAI_TOOL_SCHEMAS = [
                         "type": "string",
                         "description": "Categoria do instrumento (ex: 'Violões', 'Guitarras', 'Baixos', 'Baterias', 'Teclados', 'Sopro', 'Cordas Orquestrais', 'Ukuleles').",
                     },
+                    "string_type": {
+                        "type": "string",
+                        "description": "Tipo de corda desejada: 'aço' ('steel') ou 'nylon'.",
+                    },
                     "min_price": {
                         "type": "number",
                         "description": "Preço mínimo em reais (BRL).",
                     },
                     "max_price": {
                         "type": "number",
-                        "description": "Preço máximo em reais (BRL). Exemplo: 1000 para violões até R$ 1.000,00.",
+                        "description": "Preço máximo em reais (BRL). Exemplo: 1000 para instrumentos até R$ 1.000,00.",
                     },
                     "in_stock_only": {
                         "type": "boolean",

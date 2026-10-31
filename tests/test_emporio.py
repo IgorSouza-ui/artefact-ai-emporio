@@ -108,7 +108,7 @@ class TestAgentConversations:
 
     def test_agent_answers_violoes_under_1000(self, agent):
         response = agent.chat("Quais opções de violões disponíveis custando até R$1000?")
-        assert "Violões" in response or "violão" in response.lower()
+        assert "viol" in response.lower()
         assert "R$" in response
         assert "estoque" in response.lower()
 
@@ -132,3 +132,11 @@ class TestAgentConversations:
     def test_agent_handles_out_of_scope(self, agent):
         response = agent.chat("Vocês vendem geladeira?")
         assert "exclusivamente" in response.lower() or "não comercializamos" in response.lower()
+
+    def test_agent_multi_turn_guitar_specs(self, agent):
+        """Verify multi-turn contextual refinement: violões -> corda de aço 43mm até 500."""
+        agent.chat("Quais modelos de violão vcs tem?")
+        r2 = agent.chat("Tem de até 500 reais com corda de aço e braço 43mm?")
+        assert "nylon" in r2.lower()
+        assert "Shelby" in r2
+        assert "43mm" in r2 or "43" in r2

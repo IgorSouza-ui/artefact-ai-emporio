@@ -1,6 +1,7 @@
 """Database management and query operations for Empório da Música."""
 
 import sqlite3
+import json
 from typing import Any, Dict, List, Optional
 import pandas as pd
 from src.config import DB_PATH, DATA_DIR, format_currency_brl
@@ -57,7 +58,6 @@ def calculate_payment_terms(price_brl: float) -> Dict[str, Any]:
     max_installments = 1
 
     if price_brl >= 100 * 7:
-        # Check if can do up to 12x with min installment of 100
         max_installments = min(12, int(price_brl // 100))
     elif price_brl >= 80 * 4:
         max_installments = min(6, int(price_brl // 80))
@@ -81,14 +81,13 @@ def calculate_payment_terms(price_brl: float) -> Dict[str, Any]:
 def search_products(
     query: Optional[str] = None,
     category_name: Optional[str] = None,
+    string_type: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     in_stock_only: bool = True,
     limit: int = 5,
 ) -> List[Dict[str, Any]]:
-    """Search products with category, price range, and stock filtering.
-    Always includes active promotional pricing if applicable.
-    """
+    """Search products with category, price range, stock, and specs filtering."""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -117,16 +116,32 @@ def search_products(
     if in_stock_only:
         sql += " AND p.stock_quantity > 0 AND p.status = 'active'"
 
-    if query:
-        # Search in product name or description
-        tokens = query.strip().split()
-        for token in tokens:
-            sql += " AND (p.name LIKE ? OR p.description LIKE ? OR p.specs LIKE ?)"
-            params.extend([f"%{token}%", f"%{token}%", f"%{token}%"])
-
     if category_name:
         sql += " AND (c.name LIKE ? OR c.description LIKE ?)"
         params.extend([f"%{category_name}%", f"%{category_name}%"])
+
+    if string_type:
+        st = string_type.lower()
+        if "aço" in st or "aco" in st or "steel" in st:
+            sql += " AND (p.specs LIKE '%steel%' OR p.name LIKE '%aço%' OR p.description LIKE '%aço%')"
+        elif "nylon" in st:
+            sql += " AND (p.specs LIKE '%nylon%' OR p.name LIKE '%nylon%' OR p.description LIKE '%nylon%')"
+
+    if query:
+        tokens = query.strip().split()
+        for token in tokens:
+            t_lower = token.lower()
+            if t_lower in ("aço", "aco", "steel"):
+                sql += " AND (p.specs LIKE '%steel%' OR p.name LIKE '%aço%' OR p.description LIKE '%aço%')"
+            elif t_lower == "nylon":
+                sql += " AND (p.specs LIKE '%nylon%' OR p.name LIKE '%nylon%' OR p.description LIKE '%nylon%')"
+            elif t_lower in ("violão", "violao", "guitarra", "baixo", "bateria", "teclado", "ukulele"):
+                # Handled via category or general search
+                sql += " AND (p.name LIKE ? OR p.description LIKE ? OR c.name LIKE ?)"
+                params.extend([f"%{token}%", f"%{token}%", f"%{token}%"])
+            else:
+                sql += " AND (p.name LIKE ? OR p.description LIKE ? OR p.specs LIKE ?)"
+                params.extend([f"%{token}%", f"%{token}%", f"%{token}%"])
 
     if min_price is not None:
         sql += " AND p.price_brl >= ?"
@@ -157,6 +172,13 @@ def search_products(
 
         payment_terms = calculate_payment_terms(final_price)
 
+        parsed_specs = {}
+        try:
+            if r["specs"]:
+                parsed_specs = json.loads(r["specs"])
+        except Exception:
+            pass
+
         results.append({
             "product_id": r["product_id"],
             "name": r["name"],
@@ -170,7 +192,7 @@ def search_products(
             "promotion_description": r["promo_description"] if has_active_promo else None,
             "stock_quantity": r["stock_quantity"],
             "is_in_stock": r["stock_quantity"] > 0,
-            "specs": r["specs"],
+            "specs": parsed_specs,
             "payment_terms": payment_terms,
         })
 
@@ -194,7 +216,6 @@ def get_product_details(identifier: str) -> Optional[Dict[str, Any]]:
         """
         cursor.execute(sql, (int(identifier),))
     else:
-        # Match by name
         sql = """
             SELECT p.*, c.name AS category_name
             FROM products p
@@ -217,7 +238,6 @@ def get_product_details(identifier: str) -> Optional[Dict[str, Any]]:
     product_id = row["product_id"]
     price = float(row["price_brl"])
 
-    # Check for any promotions (both active and inactive)
     cursor.execute(
         "SELECT promotion_id, discount_percent, description, is_active FROM promotions WHERE product_id = ?",
         (product_id,),
@@ -249,12 +269,19 @@ def get_product_details(identifier: str) -> Optional[Dict[str, Any]]:
 
     payment_terms = calculate_payment_terms(final_price)
 
+    parsed_specs = {}
+    try:
+        if row["specs"]:
+            parsed_specs = json.loads(row["specs"])
+    except Exception:
+        pass
+
     result = {
         "product_id": row["product_id"],
         "name": row["name"],
         "category": row["category_name"],
         "description": row["description"],
-        "specs": row["specs"],
+        "specs": parsed_specs,
         "original_price": price,
         "original_price_formatted": format_currency_brl(price),
         "final_price": final_price,
@@ -325,7 +352,6 @@ def get_order_status(
 
     oid = order_row["order_id"]
 
-    # Fetch ordered items
     item_sql = """
         SELECT
             oi.quantity,

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Interactive Terminal Interface (CLI) for Empório da Música AI Assistant."""
+"""Interactive Terminal Interface (CLI) for Empório da Música Assistant."""
 
 import os
+import re
 import sys
 
 # Configure UTF-8 stdout/stdin for Windows command prompts
@@ -22,35 +23,41 @@ try:
     CYAN = Fore.CYAN
     GREEN = Fore.GREEN
     YELLOW = Fore.YELLOW
-    MAGENTA = Fore.MAGENTA
-    RED = Fore.RED
-    BRIGHT = Style.BRIGHT
+    WHITE = Fore.WHITE
+    BOLD = Style.BRIGHT
     RESET = Style.RESET_ALL
 except ImportError:
-    CYAN = GREEN = YELLOW = MAGENTA = RED = BRIGHT = RESET = ""
+    CYAN = GREEN = YELLOW = WHITE = BOLD = RESET = ""
 
 from src.agent import EmporioAgent
-from src import config
+
+
+def format_for_terminal(text: str) -> str:
+    """Format markdown for clean terminal display without raw asterisks."""
+    if not text:
+        return ""
+
+    # Replace **bold** with ANSI bold if supported, otherwise just remove asterisks
+    if BOLD:
+        formatted = re.sub(r"\*\*(.*?)\*\*", rf"{BOLD}\1{RESET}", text)
+        formatted = re.sub(r"~~(.*?)~~", r"\1", formatted)
+        formatted = re.sub(r"\*(.*?)\*", r"\1", formatted)
+    else:
+        formatted = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+        formatted = re.sub(r"~~(.*?)~~", r"\1", formatted)
+        formatted = re.sub(r"\*(.*?)\*", r"\1", formatted)
+
+    return formatted
 
 
 def print_banner(agent: EmporioAgent):
-    print(f"\n{CYAN}{'═' * 70}{RESET}")
-    print(f"{CYAN}{BRIGHT}   🎸 EMPÓRIO DA MÚSICA — ASSISTENTE VIRTUAL DE ATENDIMENTO 🎶{RESET}")
-    print(f"{CYAN}   Rua 14 de Maio, 3200 — Centro, Campo Grande - MS | (67) 3341-4444{RESET}")
-    print(f"{CYAN}{'═' * 70}{RESET}")
-    print(f"{YELLOW}• Motor Ativo:{RESET} {agent.get_provider_name()}")
-    print(f"{YELLOW}• Modo de Operação:{RESET} Atendimento ao Cliente em Tempo Real via Terminal")
-    print(f"{CYAN}{'─' * 70}{RESET}")
-    print(f"{BRIGHT}Sugestões de perguntas para testar:{RESET}")
-    print(f"  {GREEN}[1]{RESET} Quais opções de violões disponíveis custando até R$1000?")
-    print(f"  {GREEN}[2]{RESET} Qual o endereço da loja e horário de funcionamento?")
-    print(f"  {GREEN}[3]{RESET} Quanto custa o Takamine GD20?")
-    print(f"  {GREEN}[4]{RESET} Me arrependi da minha compra, posso devolver meu pedido?")
-    print(f"  {GREEN}[5]{RESET} Qual o status do pedido com rastreio BRJL5544332BR?")
-    print(f"  {GREEN}[6]{RESET} Vocês vendem geladeira ou corda avulsa de guitarra?")
-    print(f"{CYAN}{'─' * 70}{RESET}")
-    print(f"Comandos: digite {YELLOW}'sair'{RESET} para encerrar, {YELLOW}'limpar'{RESET} para reiniciar o histórico.")
-    print(f"{CYAN}{'═' * 70}{RESET}\n")
+    print(f"\n{CYAN}======================================================================{RESET}")
+    print(f"{BOLD}  EMPÓRIO DA MÚSICA — ATENDIMENTO AO CLIENTE{RESET}")
+    print(f"  Rua 14 de Maio, 3200 — Centro, Campo Grande - MS | (67) 3341-4444")
+    print(f"{CYAN}======================================================================{RESET}")
+    print(f"Engine ativo: {YELLOW}{agent.get_provider_name()}{RESET}")
+    print(f"Digite sua mensagem abaixo (ou 'sair' para encerrar, 'limpar' para reiniciar).")
+    print(f"{CYAN}----------------------------------------------------------------------{RESET}\n")
 
 
 def main():
@@ -59,19 +66,19 @@ def main():
 
     while True:
         try:
-            user_input = input(f"{BRIGHT}{GREEN}Você > {RESET}").strip()
+            user_input = input(f"{BOLD}{GREEN}Você > {RESET}").strip()
 
             if not user_input:
                 continue
 
             lower_cmd = user_input.lower()
             if lower_cmd in ("sair", "exit", "quit", "q"):
-                print(f"\n{CYAN}Empório da Música > Obrigado pelo contato! Que a sua música nunca pare. Até logo! 🎶{RESET}\n")
+                print(f"\n{CYAN}Empório da Música > Obrigado pelo contato! Estamos à disposição. Até logo!{RESET}\n")
                 break
 
             if lower_cmd in ("limpar", "clear", "cls", "reset"):
                 agent.reset_conversation()
-                print(f"\n{YELLOW}✓ Histórico de conversa reiniciado com sucesso.{RESET}\n")
+                print(f"\n{YELLOW}[Histórico de conversa reiniciado]{RESET}\n")
                 continue
 
             if lower_cmd in ("ajuda", "help", "?"):
@@ -80,15 +87,16 @@ def main():
 
             # Process message
             response = agent.chat(user_input)
+            clean_resp = format_for_terminal(response)
 
-            print(f"\n{BRIGHT}{CYAN}Empório da Música >{RESET}")
-            print(f"{response}\n")
+            print(f"\n{BOLD}{CYAN}Empório da Música >{RESET}")
+            print(f"{clean_resp}\n")
 
         except (KeyboardInterrupt, EOFError):
-            print(f"\n\n{CYAN}Empório da Música > Até logo! 🎶{RESET}\n")
+            print(f"\n\n{CYAN}Empório da Música > Até logo!{RESET}\n")
             break
         except Exception as e:
-            print(f"\n{RED}[Erro inesperado]: {e}{RESET}\n")
+            print(f"\n[Erro]: {e}\n")
 
 
 if __name__ == "__main__":

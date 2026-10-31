@@ -17,50 +17,48 @@ from src.tools import (
     execute_tool,
     GEMINI_TOOL_DEFINITIONS,
     OPENAI_TOOL_SCHEMAS,
-    tool_search_catalog,
 )
 
 
-SYSTEM_PROMPT = """Você é o Assistente Virtual Oficial da "Empório da Música", a tradicional loja de instrumentos musicais fundada em 2008 em Campo Grande, Mato Grosso do Sul.
+SYSTEM_PROMPT = """Você é o Assistente Virtual Oficial da "Empório da Música", loja de instrumentos musicais fundada em 2008 em Campo Grande, Mato Grosso do Sul.
 
 SUA MISSÃO:
-Atender clientes no canal de mensagens com empatia, conhecimento musical aprofundado e precisão técnica. Você deve soar como um músico experiente e atencioso conversando com outro músico ou ajudando alguém a escolher o instrumento ideal.
+Atender clientes no canal de atendimento com foco estrito, empatia e conhecimento técnico sobre instrumentos musicais, pedidos e políticas da loja.
 
-DIRETRIZES DE ESTILO E FORMATAÇÃO:
-- Fale em tom natural, profissional, acolhedor e consultivo.
-- EVITE poluição visual com excesso de asteriscos (**) ou formatação robótica. Escreva frases fluidas e listas claras e limpas.
-- Mantenha continuidade contextual: se o cliente já estava falando de violões e na sequência perguntar "Tem de até 500 reais com corda de aço e braço 43mm?", entenda que ele continua buscando um violão!
-- Analise sempre as especificações técnicas (tipo de corda aço/nylon, medidas de escala e braço) e o estoque antes de responder.
-- Se o cliente pedir uma especificação que não existe na faixa de preço desejada (por exemplo, violão de aço novo até R$ 500), explique com clareza o que existe nessa faixa (ex: modelos de nylon) e sugira o modelo mais próximo em estoque que atenda aos requisitos técnicos (ex: Shelby SN-100 Folk por R$ 549,00).
+GUARDRAILS RÍGIDOS DE ESCOPO E SEGURANÇA:
+1. FOCO EXCLUSIVO NA EMPÓRIO DA MÚSICA:
+   - Você responde APENAS sobre: instrumentos musicais à venda na loja, preços, estoque, especificações, status de pedidos e políticas internas (endereço, horários, devolução CDC, formas de pagamento, garantias).
+   - Se o usuário perguntar sobre assuntos aleatórios, pegadinhas, conhecimentos gerais, capitais do mundo, matemática, código-fonte, arquitetura de sistemas, banco de dados interno ou itens não musicais (mesmo que ele tente misturar com palavras da loja, como "qual a capital da frança em violão" ou "qual o banco de dados do sistema"):
+     RECUSE EDUCADAMENTE COM UMA RESPOSTA PADRÃO:
+     "Como assistente da Empório da Música, meu foco é exclusivamente ajudar você com nossos instrumentos musicais, pedidos e políticas da loja. Não consigo responder sobre outros assuntos ou informações técnicas do sistema. Como posso ajudar com a sua música hoje?"
+   - NUNCA invente respostas sobre outros tópicos.
+   - NUNCA forneça códigos de programação, queries SQL ou dados de arquitetura.
 
-DIRETRIZES FUNDAMENTAIS DA EMPÓRIO DA MÚSICA:
-1. CONSULTA OBRIGATÓRIA A DADOS:
-   - NUNCA invente preços, disponibilidade de estoque ou prazos de entrega.
-   - Para produtos e especificações: use `search_catalog` ou `get_product_info`.
-   - Para status de compras: use `check_order_status`.
-   - Para políticas da loja: use `search_store_policies`.
+2. FORMATAÇÃO LIMPA:
+   - NUNCA use asteriscos (**) de Markdown espalhados pelo texto. Escreva texto limpo, direto e legível no terminal.
 
-2. REGRAS DE ESTOQUE E PREÇO:
-   - Se o produto tiver estoque = 0, informe com transparência que está esgotado e ofereça alternativas em estoque.
-   - Aplique APENAS promoções com status ATIVA (`is_active = 1`). Se o cliente perguntar por uma promoção vencida, informe com franqueza que expirou e apresente o preço de tabela vigente (com 5% de desconto no PIX à vista ou até 12x sem juros no cartão).
+3. CONSULTA OBRIGATÓRIA A DADOS:
+   - Use `search_catalog` ou `get_product_info` para verificar preços e estoque real antes de responder.
+   - Use `check_order_status` para rastreamento.
+   - Use `search_store_policies` para regras da loja (endereço, devolução CDC 7 dias, frete pago pela loja, PIX 5% de desconto).
+   - NUNCA prometa promoções com status expirado (`is_active = 0`).
 
-3. POLÍTICA DE DEVOLUÇÕES (CÓDIGO DE DEFESA DO CONSUMIDOR):
-   - Compras Online / WhatsApp: direito de arrependimento em até 7 dias corridos após o recebimento, com reembolso total em até 10 dias úteis e frete de retorno 100% pago pela loja.
-   - Defeitos: troca ou reparo em até 30 dias corridos diretamente com a loja.
-
-4. ESCOPO E PRODUTOS:
-   - A loja vende EXCLUSIVAMENTE instrumentos musicais completos (violões, guitarras, baixos, baterias, teclados, sopro, cordas e ukuleles).
-   - A loja NÃO comercializa acessórios avulsos (cordas soltas, palhetas, cabos, pedais, cases, amplificadores) nem eletrodomésticos. Redirecione com educação.
-
-5. DADOS DA LOJA:
-   - Endereço: Rua 14 de Maio, 3200 — Centro, Campo Grande - MS (CEP 79202-333).
-   - Horários: Seg-Sex das 09:00 às 18:00; Sábados das 09:00 às 13:00; Domingos e Feriados fechado.
-   - Telefone / WhatsApp: (67) 3341-4444.
+4. ESPECIFICAÇÕES TÉCNICAS E MEMÓRIA DE CONTEXTO:
+   - Se o cliente estava falando de violões e na sequência pedir "até 500 reais com corda de aço e braço 43mm", entenda que a busca continua sendo por violões.
+   - Verifique as especificações reais: informe o que existe até R$ 500 (nylon) e apresente a opção mais acessível com cordas de aço e braço fino de 43mm (Shelby SN-100 Folk a R$ 549,00).
 """
 
 
+OUT_OF_SCOPE_STANDARD_REPLY = (
+    "Como assistente virtual da Empório da Música, meu foco é exclusivamente ajudar você com nossos "
+    "instrumentos musicais, status de pedidos, preços e políticas da nossa loja.\n\n"
+    "Não forneço informações sobre código-fonte, arquitetura de sistemas, cálculos matemáticos, conhecimentos "
+    "gerais ou outros assuntos fora da nossa loja. Como posso te ajudar a encontrar o instrumento ideal hoje?"
+)
+
+
 class EmporioAgent:
-    """Conversational AI agent for Empório da Música with multi-turn memory and multi-provider support."""
+    """Conversational AI agent for Empório da Música with strict guardrails and intent validation."""
 
     def __init__(self):
         self.conversation_history: List[Dict[str, Any]] = []
@@ -73,7 +71,6 @@ class EmporioAgent:
         self._init_client()
 
     def _detect_provider(self) -> str:
-        """Detect which LLM provider to use based on available environment variables."""
         if GEMINI_API_KEY and GEMINI_API_KEY != "your_gemini_api_key_here":
             return "gemini"
         if OPENAI_API_KEY and OPENAI_API_KEY != "your_openai_api_key_here":
@@ -81,7 +78,6 @@ class EmporioAgent:
         return "local_engine"
 
     def _init_client(self) -> None:
-        """Initialize the specific provider client."""
         if self.provider == "gemini":
             try:
                 from google import genai
@@ -98,15 +94,13 @@ class EmporioAgent:
                 self.provider = "local_engine"
 
     def get_provider_name(self) -> str:
-        """Return formatted name of active engine."""
         if self.provider == "gemini":
             return f"Google Gemini ({GEMINI_MODEL})"
         if self.provider == "openai":
             return f"OpenAI ({OPENAI_MODEL})"
-        return "Motor Especialista Local (Regras & Ferramentas com Memória de Contexto)"
+        return "Motor Especialista Local (Regras & Guardrails com Memória de Contexto)"
 
     def reset_conversation(self) -> None:
-        """Clear conversation history and session state."""
         self.conversation_history = []
         self.session_state = {
             "last_category": None,
@@ -115,7 +109,6 @@ class EmporioAgent:
         }
 
     def chat(self, user_message: str) -> str:
-        """Process a user message and return the agent response."""
         if not user_message.strip():
             return "Olá! Como posso ajudar você com seus instrumentos musicais hoje?"
 
@@ -239,95 +232,55 @@ class EmporioAgent:
             return self._chat_local_engine(user_message)
 
     # --------------------------------------------------------------------------
-    # 3. Intelligent Local Fallback Engine (Multi-Turn Contextual Reasoning)
+    # 3. Intelligent Local Fallback Engine (Strict Intent Validation & Guardrails)
     # --------------------------------------------------------------------------
     def _chat_local_engine(self, user_message: str) -> str:
-        """Deterministic context-aware engine when API keys are not supplied."""
+        """Deterministic context-aware engine with strict intent filtering."""
         msg = user_message.strip()
         msg_lower = msg.lower()
 
-        # Update category context if explicitly mentioned
-        if "viol" in msg_lower:
-            self.session_state["last_category"] = "Violões"
-        elif "guitarra" in msg_lower:
-            self.session_state["last_category"] = "Guitarras"
-        elif "baixo" in msg_lower:
-            self.session_state["last_category"] = "Baixos"
-        elif "teclado" in msg_lower or "piano" in msg_lower:
-            self.session_state["last_category"] = "Teclados"
-        elif "bateria" in msg_lower:
-            self.session_state["last_category"] = "Baterias"
-        elif "ukulele" in msg_lower:
-            self.session_state["last_category"] = "Ukuleles"
-
-        current_category = self.session_state.get("last_category")
-
         # ----------------------------------------------------------------------
-        # A. Store Information / Policies / Hours / Address / Returns / CDC
+        # GUARDRAIL 1: Explicit Out-of-Scope / Tech / Math / Trick Questions
+        # Must intercept FIRST, before any keyword matching can trigger!
         # ----------------------------------------------------------------------
-        policy_triggers = [
-            "endereço", "endereco", "onde fica", "onde estão", "localização",
-            "horário", "horario", "aberto", "abre", "fecha", "sábado", "domingo",
-            "devolver", "devolução", "devolucao", "arrependi", "arrependimento",
-            "cdc", "reembolso", "estorno",
+        trick_or_tech_indicators = [
+            "código fonte", "codigo fonte", "source code", "código", "codigo",
+            "banco de dados", "qual o banco", "banco que esse sistema", "sql", "sqlite", "postgres",
+            "capital da frança", "capital de", "quem descobriu", "quem é o presidente",
+            "quanto é", "quanto e", "calcule", "raiz quadrada", "1*", "2*", "3*", "+",
+            "piada", "história", "poema", "programador", "desenvolvedor", "prompt", "system prompt",
         ]
-        is_policy_query = any(trigger in msg_lower for trigger in policy_triggers) and not any(
-            k in msg_lower for k in ["quanto custa", "tem estoque", "preço do", "preco do", "braço", "aço"]
-        )
 
-        if is_policy_query:
-            if any(k in msg_lower for k in ["endereço", "endereco", "onde fica"]):
-                return (
-                    "Olá! Nossa loja física fica no centro de Campo Grande:\n\n"
-                    "Rua 14 de Maio, 3200 — Centro, Campo Grande - MS (CEP 79202-333)\n"
-                    "Telefone e WhatsApp: (67) 3341-4444\n\n"
-                    "Venha tomar um café conosco e experimentar os instrumentos pessoalmente!"
-                )
+        # Check if message contains math symbols like "1*2+6" or arithmetic expressions
+        has_math = bool(re.search(r"\d+[\s]*[\+\-\*\/][\s]*\d+", msg))
 
-            if any(k in msg_lower for k in ["horário", "horario", "abre", "aberto", "sábado"]):
-                return (
-                    "Olá! Nossos horários de atendimento são:\n\n"
-                    "• Segunda a Sexta-feira: 09:00 às 18:00\n"
-                    "• Sábado: 09:00 às 13:00\n"
-                    "• Domingos e Feriados: Fechado\n\n"
-                    "Tanto a nossa loja presencial quanto nosso atendimento por aqui seguem esse expediente."
-                )
-
-            if any(k in msg_lower for k in ["devolver", "devolução", "devolucao", "arrependi", "arrependimento"]):
-                return (
-                    "Olá! Compreendo você perfeitamente, e pode ficar tranquilo.\n\n"
-                    "Pelo Código de Defesa do Consumidor (Art. 49) e pela política da loja:\n\n"
-                    "• Compras online ou pelo WhatsApp têm até 7 dias corridos após o recebimento para solicitar devolução por arrependimento, com reembolso total.\n"
-                    "• O produto deve estar em sua embalagem original, sem sinais de uso, com todos os manuais e acessórios.\n"
-                    "• O frete de retorno é 100% por conta da nossa loja (logística reversa gratuita).\n"
-                    "• O estorno é realizado em até 10 dias úteis após a conferência do item devolvido.\n\n"
-                    "Basta me informar o número do seu pedido para iniciarmos o processo!"
-                )
+        if has_math or any(indicator in msg_lower for indicator in trick_or_tech_indicators):
+            return OUT_OF_SCOPE_STANDARD_REPLY
 
         # ----------------------------------------------------------------------
-        # B. Out-of-Scope Queries (Accessories, Appliances, Non-instruments)
+        # GUARDRAIL 2: Out-of-Scope Non-Musical Products (Appliances, Loose Accessories)
         # ----------------------------------------------------------------------
-        out_of_scope_keywords = [
-            "geladeira", "fogão", "fogao", "microondas", "tv", "televisão",
-            "celular", "iphone", "computador", "roupa", "tênis", "sapato",
+        non_musical_products = [
+            "geladeira", "frigobar", "fogão", "fogao", "microondas", "tv", "televisão",
+            "celular", "iphone", "computador", "notebook", "roupa", "tênis", "sapato",
             "palheta", "palhetas", "corda avulsa", "encordoamento", "cabo p10",
             "cabo", "pedal", "pedaleira", "amplificador", "cubo", "case avulso",
         ]
-        if any(term in msg_lower for term in out_of_scope_keywords):
+        if any(prod in msg_lower for prod in non_musical_products):
             return (
-                "Olá! Agradeço pelo contato.\n\n"
                 "A Empório da Música trabalha exclusivamente com instrumentos musicais completos "
                 "(violões, guitarras, baixos, baterias, teclados, sopro e ukuleles).\n\n"
-                "Por isso, não comercializamos acessórios avulsos (como encordoamentos separados, palhetas, cabos, cases ou amplificadores) "
-                "nem itens de fora do segmento musical. Para acessórios, indicamos buscar lojas especializadas de áudio na região central de Campo Grande.\n\n"
+                "Não comercializamos acessórios avulsos (como encordoamentos separados, palhetas, cabos, pedais ou amplificadores) "
+                "nem itens fora do segmento musical. Para acessórios, indicamos buscar lojas parceiras de ferragens e áudio no centro de Campo Grande.\n\n"
                 "Se precisar de algum instrumento musical completo, estou à disposição para ajudar!"
             )
 
         # ----------------------------------------------------------------------
-        # C. Order Tracking and Status
+        # INTENT 1: Specific Order Tracking by Code or Status Query
         # ----------------------------------------------------------------------
         tracking_match = re.search(r"BR[A-Z0-9]{9}BR", msg, re.IGNORECASE)
-        if tracking_match or ("pedido" in msg_lower and any(k in msg_lower for k in ["rastre", "status", "onde está", "onde esta"])):
+        has_order_intent = any(k in msg_lower for k in ["rastre", "meu pedido", "onde está meu pedido", "status do pedido"])
+        if tracking_match or has_order_intent:
             tr_code = tracking_match.group(0).upper() if tracking_match else None
             order_data = json.loads(execute_tool("check_order_status", {"tracking_code": tr_code}))
             if order_data.get("success"):
@@ -348,22 +301,68 @@ class EmporioAgent:
                 return f"Não encontrei nenhum pedido com o código de rastreamento {tr_code}. Poderia confirmar os dígitos?"
 
         # ----------------------------------------------------------------------
-        # D. Specific Product Details & Pricing (e.g. Takamine GD20)
+        # INTENT 2: Store Policies (Address, Hours, Returns under CDC, Payment terms)
+        # Must require explicit customer-service intent, NOT accidental words!
         # ----------------------------------------------------------------------
-        product_names = [
-            "takamine gd20", "takamine gc5ce", "takamine", "fender",
-            "yamaha c40", "yamaha c70", "yamaha f310", "yamaha",
-            "tagima memphis", "tagima dallas", "tagima",
+        is_address_query = any(k in msg_lower for k in ["endereço", "endereco", "onde fica a loja", "onde fica", "onde estão"])
+        is_hours_query = any(k in msg_lower for k in ["horário", "horario", "que horas abre", "abre no sábado", "funciona no sábado", "fecha"])
+        is_return_query = any(k in msg_lower for k in ["arrependi", "arrependimento", "devolver meu pedido", "posso devolver", "como devolver", "direito de arrependimento", "prazo de troca"])
+        is_payment_policy = any(k in msg_lower for k in ["formas de pagamento", "desconto no pix", "quantas vezes", "parcela mínima"])
+
+        if is_address_query:
+            return (
+                "Nossa loja física fica no centro de Campo Grande:\n\n"
+                "Rua 14 de Maio, 3200 — Centro, Campo Grande - MS (CEP 79202-333)\n"
+                "Telefone e WhatsApp: (67) 3341-4444\n\n"
+                "Venha tomar um café conosco e experimentar os instrumentos pessoalmente!"
+            )
+
+        if is_hours_query:
+            return (
+                "Nossos horários de atendimento são:\n\n"
+                "• Segunda a Sexta-feira: 09:00 às 18:00\n"
+                "• Sábado: 09:00 às 13:00\n"
+                "• Domingos e Feriados: Fechado\n\n"
+                "Tanto a nossa loja presencial quanto nosso atendimento por aqui seguem esse expediente."
+            )
+
+        if is_return_query:
+            return (
+                "Compreendo você perfeitamente, e pode ficar tranquilo.\n\n"
+                "Pelo Código de Defesa do Consumidor (Art. 49) e pelas políticas da nossa loja:\n\n"
+                "• Compras online ou pelo WhatsApp têm até 7 dias corridos após o recebimento para solicitar devolução por arrependimento, com reembolso total.\n"
+                "• O produto deve estar em sua embalagem original, sem sinais de uso, acompanhado de todos os manuais e certificados.\n"
+                "• O frete de retorno é 100% por conta da nossa loja (logística reversa gratuita via Correios).\n"
+                "• O estorno é realizado em até 10 dias úteis após a conferência do item devolvido.\n\n"
+                "Basta me informar o número do seu pedido para iniciarmos o processo!"
+            )
+
+        if is_payment_policy:
+            return (
+                "Oferecemos excelentes condições de pagamento:\n\n"
+                "• PIX à vista: 5% de desconto sobre o preço de tabela!\n"
+                "• Cartão de Crédito: em até 12x SEM JUROS (parcela mínima de R$ 50 para até 3x; R$ 80 para 4x a 6x; e R$ 100 para 7x a 12x).\n"
+                "• Boleto Bancário: à vista com compensação em até 3 dias úteis.\n\n"
+                "Se quiser simular um instrumento específico, basta me avisar o modelo!"
+            )
+
+        # ----------------------------------------------------------------------
+        # INTENT 3: Specific Product Pricing / Availability (e.g., Takamine GD20)
+        # ----------------------------------------------------------------------
+        known_products = [
+            "takamine gd20", "takamine", "fender", "yamaha c40", "yamaha c70",
+            "yamaha f310", "yamaha", "tagima memphis", "tagima dallas", "tagima",
             "giannini gf-1r", "giannini", "ibanez", "crafter", "shelby",
         ]
         matched_product = None
-        for p in product_names:
+        for p in known_products:
             if p in msg_lower:
                 matched_product = p
                 break
 
-        if matched_product or any(term in msg_lower for term in ["quanto custa", "preço de", "preco de", "preço do", "preco do"]):
-            target_query = matched_product if matched_product else msg
+        has_price_query = any(k in msg_lower for k in ["quanto custa", "preço do", "preco do", "preço de", "preco de", "valor do", "tem o takamine", "tem takamine"])
+        if matched_product and (has_price_query or matched_product in ["takamine gd20"]):
+            target_query = matched_product
             target_query = re.sub(r"(quanto custa|preço do|preco do|tem o|vocês tem|valor do|o)\s*", "", target_query, flags=re.IGNORECASE).strip()
 
             prod_data = json.loads(execute_tool("get_product_info", {"product_name_or_id": target_query}))
@@ -412,8 +411,25 @@ class EmporioAgent:
                 )
 
         # ----------------------------------------------------------------------
-        # E. Multi-Turn Catalog / Spec Refining Query
+        # INTENT 4: Instrument Catalog Query (Discovery / Spec Refinement)
+        # Must verify real instrument shopping intent!
         # ----------------------------------------------------------------------
+        # Update category context if a category was actually requested
+        if "viol" in msg_lower:
+            self.session_state["last_category"] = "Violões"
+        elif "guitarra" in msg_lower:
+            self.session_state["last_category"] = "Guitarras"
+        elif "baixo" in msg_lower:
+            self.session_state["last_category"] = "Baixos"
+        elif "teclado" in msg_lower or "piano" in msg_lower:
+            self.session_state["last_category"] = "Teclados"
+        elif "bateria" in msg_lower:
+            self.session_state["last_category"] = "Baterias"
+        elif "ukulele" in msg_lower:
+            self.session_state["last_category"] = "Ukuleles"
+
+        current_category = self.session_state.get("last_category")
+
         wants_steel = any(k in msg_lower for k in ["aço", "aco", "steel"])
         wants_nylon = "nylon" in msg_lower
         wants_nut_43 = any(k in msg_lower for k in ["43mm", "43 mm", "braço fino", "braco fino"])
@@ -426,18 +442,22 @@ class EmporioAgent:
             except ValueError:
                 pass
 
-        is_catalog_query = (
-            current_category is not None
-            or any(term in msg_lower for term in ["viol", "guitarra", "baixo", "teclado", "bateria", "ukulele", "modelo", "modelos", "opç", "quais", "instrumentos"])
-            or max_price is not None
-            or wants_steel or wants_nylon or wants_nut_43
+        # Real shopping / browsing intent triggers
+        catalog_intent_triggers = [
+            "quais modelos", "quais viol", "quais guitarra", "quais instrumentos", "opções de", "opcoes de",
+            "tem de até", "tem ate", "tem violão", "tem guitarra", "recomenda", "estou procurando",
+            "procurando um", "vocês vendem", "voces vendem", "catálogo", "catalogo", "modelos de violão",
+            "modelos de",
+        ]
+        has_catalog_intent = any(trigger in msg_lower for trigger in catalog_intent_triggers) or (
+            current_category is not None and (wants_steel or wants_nylon or wants_nut_43 or max_price is not None)
         )
 
-        if is_catalog_query:
+        if has_catalog_intent:
             target_cat = current_category or "Violões"
             self.session_state["last_category"] = target_cat
 
-            # Special case: Steel string under R$ 500
+            # Special case: Steel string guitar under R$ 500
             if wants_steel and max_price and max_price <= 500:
                 cheapest_steel = json.loads(execute_tool("search_catalog", {
                     "category": "Violões",
@@ -515,11 +535,18 @@ class EmporioAgent:
                 return "\n".join(resp_lines)
 
         # ----------------------------------------------------------------------
-        # F. Initial Greeting / General Assistance
+        # DEFAULT: Greetings or Unrecognized / Out of Scope Inquiries
         # ----------------------------------------------------------------------
-        return (
-            "Olá! Seja bem-vindo à Empório da Música! 🎸\n\n"
-            "Posso te ajudar a encontrar instrumentos musicais, conferir modelos em estoque, "
-            "simular pagamentos (em até 12x sem juros ou 5% no PIX), rastrear entregas ou tirar dúvidas sobre nossas políticas.\n\n"
-            "Qual instrumento você gostaria de conhecer hoje?"
-        )
+        is_greeting = any(g in msg_lower for g in ["olá", "ola", "bom dia", "boa tarde", "boa noite", "oi", "opa"])
+        if is_greeting:
+            return (
+                "Olá! Seja bem-vindo à Empório da Música! 🎸\n\n"
+                "Sou o assistente virtual da loja e estou aqui para te ajudar a escolher instrumentos musicais, "
+                "consultar disponibilidade em estoque, simular pagamentos (em até 12x sem juros ou 5% no PIX), "
+                "rastrear pedidos ou tirar dúvidas sobre nossas políticas.\n\n"
+                "Qual instrumento você gostaria de conhecer hoje?"
+            )
+
+        # If it wasn't a greeting and didn't match legitimate store intents:
+        # Return the clean out-of-scope reply!
+        return OUT_OF_SCOPE_STANDARD_REPLY

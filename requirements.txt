@@ -1,0 +1,16 @@
+# Core LLM SDK
+google-genai>=0.1.0
+
+# Data Processing & Storage
+pandas>=2.0.0
+pypdf>=4.0.0
+
+# CLI & Formatting
+colorama>=0.4.6
+python-dotenv>=1.0.0
+
+# Testing
+pytest>=8.0.0
+
+# Optional Alternative Provider
+# openai>=1.0.0

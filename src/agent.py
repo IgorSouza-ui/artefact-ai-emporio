@@ -1,4 +1,4 @@
-"""Conversational agent orchestrator with Empório da Música persona and multi-provider support."""
+"""Conversational agent orchestrator with Empório da Música persona, musical expertise, and multi-provider support."""
 
 import json
 import os
@@ -20,45 +20,35 @@ from src.tools import (
 )
 
 
-SYSTEM_PROMPT = """Você é o Assistente Virtual Oficial da "Empório da Música", loja de instrumentos musicais fundada em 2008 em Campo Grande, Mato Grosso do Sul.
+SYSTEM_PROMPT = """Você é o Assistente Virtual Oficial da "Empório da Música", tradicional loja de instrumentos musicais fundada em 2008 em Campo Grande, Mato Grosso do Sul.
 
 SUA MISSÃO:
-Atender clientes no canal de atendimento com foco estrito, empatia e conhecimento técnico sobre instrumentos musicais, pedidos e políticas da loja.
+Atender clientes com empatia, profundo conhecimento musical e precisão comercial, como um vendedor e músico experiente atendendo no balcão da loja ou no WhatsApp.
 
-GUARDRAILS RÍGIDOS DE ESCOPO E SEGURANÇA:
-1. FOCO EXCLUSIVO NA EMPÓRIO DA MÚSICA:
-   - Você responde APENAS sobre: instrumentos musicais à venda na loja, preços, estoque, especificações, status de pedidos e políticas internas (endereço, horários, devolução CDC, formas de pagamento, garantias).
-   - Se o usuário perguntar sobre assuntos aleatórios, pegadinhas, conhecimentos gerais, capitais do mundo, matemática, código-fonte, arquitetura de sistemas, banco de dados interno ou itens não musicais (mesmo que ele tente misturar com palavras da loja, como "qual a capital da frança em violão" ou "qual o banco de dados do sistema"):
-     RECUSE EDUCADAMENTE COM UMA RESPOSTA PADRÃO:
-     "Como assistente da Empório da Música, meu foco é exclusivamente ajudar você com nossos instrumentos musicais, pedidos e políticas da loja. Não consigo responder sobre outros assuntos ou informações técnicas do sistema. Como posso ajudar com a sua música hoje?"
-   - NUNCA invente respostas sobre outros tópicos.
-   - NUNCA forneça códigos de programação, queries SQL ou dados de arquitetura.
+POSTURA E RESPOSTAS:
+1. DÚVIDAS MUSICAIS E CONSULTORIA (TOTALMENTE DENTRO DO ESCOPO):
+   - Se o cliente perguntar sobre como tocar uma música (ex: "quero tocar uma música em Dó menor, o que eu uso?"), tonalidades, acordes, recomendações para iniciantes, diferenças entre cordas de nylon e aço, ou qual instrumento escolher: RESPONDA COM PROPRIEDADE MUSICAL! Explique as opções disponíveis na loja (violões de nylon, violões de aço, teclados, ukuleles), como o acorde ou música é executado, e sugira instrumentos em estoque com seus respectivos preços e facilidades de pagamento.
 
-2. FORMATAÇÃO LIMPA:
-   - NUNCA use asteriscos (**) de Markdown espalhados pelo texto. Escreva texto limpo, direto e legível no terminal.
+2. ESCOPO E GUARDRAILS:
+   - Se perguntarem sobre código-fonte, banco de dados ou detalhes internos do sistema: explique com gentileza que são dados técnicos internos e ofereça ajuda com os instrumentos da loja.
+   - Se perguntarem sobre assuntos sem relação com música (cálculos matemáticos, conhecimentos gerais como capitais do mundo, notícias): responda educadamente que seu foco é exclusivo no universo da música e instrumentos da Empório da Música.
+   - A loja vende EXCLUSIVAMENTE instrumentos musicais completos. Não vendemos acessórios avulsos (cordas soltas, palhetas, cabos, pedais, amplificadores) nem eletrodomésticos. Redirecione com cordialidade.
 
-3. CONSULTA OBRIGATÓRIA A DADOS:
-   - Use `search_catalog` ou `get_product_info` para verificar preços e estoque real antes de responder.
-   - Use `check_order_status` para rastreamento.
-   - Use `search_store_policies` para regras da loja (endereço, devolução CDC 7 dias, frete pago pela loja, PIX 5% de desconto).
-   - NUNCA prometa promoções com status expirado (`is_active = 0`).
+3. ESTILO DE ESCRITA:
+   - Escreva em tom natural, caloroso e humano.
+   - NUNCA use asteriscos (**) no terminal. Use listas limpas e parágrafos bem pontuados.
 
-4. ESPECIFICAÇÕES TÉCNICAS E MEMÓRIA DE CONTEXTO:
-   - Se o cliente estava falando de violões e na sequência pedir "até 500 reais com corda de aço e braço 43mm", entenda que a busca continua sendo por violões.
-   - Verifique as especificações reais: informe o que existe até R$ 500 (nylon) e apresente a opção mais acessível com cordas de aço e braço fino de 43mm (Shelby SN-100 Folk a R$ 549,00).
+4. REGRAS COMERCIAIS E DE POLÍTICA:
+   - Consulte o sistema antes de confirmar preços ou estoque.
+   - Promoções: apenas ativas (`is_active = 1`). Se a promoção expirou (ex: Takamine GD20 com 12% vencido), explique com transparência e dê o preço de tabela vigente (R$ 2.199,00).
+   - Formas de pagamento: 5% de desconto à vista no PIX, ou até 12x sem juros no cartão de crédito.
+   - CDC: devolução por arrependimento em até 7 dias corridos para compras online/remotas, com frete 100% pago pela loja e reembolso em até 10 dias úteis.
+   - Loja física: Rua 14 de Maio, 3200 — Centro, Campo Grande - MS | Horários: Seg-Sex 09:00-18:00, Sáb 09:00-13:00.
 """
 
 
-OUT_OF_SCOPE_STANDARD_REPLY = (
-    "Como assistente virtual da Empório da Música, meu foco é exclusivamente ajudar você com nossos "
-    "instrumentos musicais, status de pedidos, preços e políticas da nossa loja.\n\n"
-    "Não forneço informações sobre código-fonte, arquitetura de sistemas, cálculos matemáticos, conhecimentos "
-    "gerais ou outros assuntos fora da nossa loja. Como posso te ajudar a encontrar o instrumento ideal hoje?"
-)
-
-
 class EmporioAgent:
-    """Conversational AI agent for Empório da Música with strict guardrails and intent validation."""
+    """Conversational AI agent for Empório da Música with domain expertise and multi-turn context."""
 
     def __init__(self):
         self.conversation_history: List[Dict[str, Any]] = []
@@ -98,7 +88,7 @@ class EmporioAgent:
             return f"Google Gemini ({GEMINI_MODEL})"
         if self.provider == "openai":
             return f"OpenAI ({OPENAI_MODEL})"
-        return "Motor Especialista Local (Regras & Guardrails com Memória de Contexto)"
+        return "Motor Especialista da Loja (Consultoria Musical, Regras & Memória de Contexto)"
 
     def reset_conversation(self) -> None:
         self.conversation_history = []
@@ -232,51 +222,109 @@ class EmporioAgent:
             return self._chat_local_engine(user_message)
 
     # --------------------------------------------------------------------------
-    # 3. Intelligent Local Fallback Engine (Strict Intent Validation & Guardrails)
+    # 3. Intelligent Local Engine with Real Musical Consultation & Strict Guardrails
     # --------------------------------------------------------------------------
     def _chat_local_engine(self, user_message: str) -> str:
-        """Deterministic context-aware engine with strict intent filtering."""
         msg = user_message.strip()
         msg_lower = msg.lower()
 
         # ----------------------------------------------------------------------
-        # GUARDRAIL 1: Explicit Out-of-Scope / Tech / Math / Trick Questions
-        # Must intercept FIRST, before any keyword matching can trigger!
+        # GUARDRAIL A: System Architecture, Source Code, Database Inspection
         # ----------------------------------------------------------------------
-        trick_or_tech_indicators = [
-            "código fonte", "codigo fonte", "source code", "código", "codigo",
-            "banco de dados", "qual o banco", "banco que esse sistema", "sql", "sqlite", "postgres",
-            "capital da frança", "capital de", "quem descobriu", "quem é o presidente",
-            "quanto é", "quanto e", "calcule", "raiz quadrada", "1*", "2*", "3*", "+",
-            "piada", "história", "poema", "programador", "desenvolvedor", "prompt", "system prompt",
+        tech_indicators = [
+            "código fonte", "codigo fonte", "source code", "banco de dados",
+            "qual o banco", "banco que esse sistema", "sql", "sqlite", "postgres",
+            "qual linguagem", "mostre o código", "mostre o codigo", "system prompt",
         ]
+        if any(term in msg_lower for term in tech_indicators):
+            return (
+                "Essas são informações técnicas e de infraestrutura interna que não compartilhamos no atendimento.\n\n"
+                "Como assistente da Empório da Música, meu trabalho é tirar todas as suas dúvidas sobre nossos "
+                "instrumentos musicais, estoque, preços, pedidos e políticas da loja. Como posso ajudar com a sua música hoje?"
+            )
 
-        # Check if message contains math symbols like "1*2+6" or arithmetic expressions
+        # ----------------------------------------------------------------------
+        # GUARDRAIL B: Math Calculations & General Trivia (e.g. 1*2+6, capital da França)
+        # ----------------------------------------------------------------------
         has_math = bool(re.search(r"\d+[\s]*[\+\-\*\/][\s]*\d+", msg))
-
-        if has_math or any(indicator in msg_lower for indicator in trick_or_tech_indicators):
-            return OUT_OF_SCOPE_STANDARD_REPLY
+        trivia_indicators = [
+            "capital da frança", "capital de", "quem é o presidente", "quem descobriu o brasil",
+            "qual a população", "raiz quadrada", "receita de bolo", "previsão do tempo",
+        ]
+        if has_math or any(term in msg_lower for term in trivia_indicators):
+            return (
+                "Meu conhecimento aqui na Empório da Música é exclusivamente focado no universo musical e nos "
+                "instrumentos da nossa loja.\n\n"
+                "Se você estiver procurando violões, guitarras, teclados, baixos ou outros instrumentos para tocar, "
+                "terei o maior prazer em te ajudar! Qual som você tem interesse em explorar?"
+            )
 
         # ----------------------------------------------------------------------
-        # GUARDRAIL 2: Out-of-Scope Non-Musical Products (Appliances, Loose Accessories)
+        # GUARDRAIL C: Non-musical Items & Loose Accessories
         # ----------------------------------------------------------------------
-        non_musical_products = [
+        non_musical = [
             "geladeira", "frigobar", "fogão", "fogao", "microondas", "tv", "televisão",
             "celular", "iphone", "computador", "notebook", "roupa", "tênis", "sapato",
             "palheta", "palhetas", "corda avulsa", "encordoamento", "cabo p10",
             "cabo", "pedal", "pedaleira", "amplificador", "cubo", "case avulso",
         ]
-        if any(prod in msg_lower for prod in non_musical_products):
+        if any(term in msg_lower for term in non_musical):
             return (
                 "A Empório da Música trabalha exclusivamente com instrumentos musicais completos "
-                "(violões, guitarras, baixos, baterias, teclados, sopro e ukuleles).\n\n"
-                "Não comercializamos acessórios avulsos (como encordoamentos separados, palhetas, cabos, pedais ou amplificadores) "
-                "nem itens fora do segmento musical. Para acessórios, indicamos buscar lojas parceiras de ferragens e áudio no centro de Campo Grande.\n\n"
-                "Se precisar de algum instrumento musical completo, estou à disposição para ajudar!"
+                "(violões, guitarras, baixos, baterias, teclados, instrumentos de sopro e ukuleles).\n\n"
+                "Por isso, não comercializamos peças avulsas (como encordoamentos separados, palhetas, cabos, pedais ou amplificadores) "
+                "nem itens fora do ramo musical. Para acessórios avulsos, indicamos buscar lojas especializadas de áudio no centro de Campo Grande.\n\n"
+                "Se precisar de algum instrumento completo, estou à disposição para ajudar!"
             )
 
         # ----------------------------------------------------------------------
-        # INTENT 1: Specific Order Tracking by Code or Status Query
+        # CONSULTORIA MUSICAL REAL (Dó Menor, Tonalidades, Acordes, Escolha de Instrumento)
+        # ----------------------------------------------------------------------
+        is_musical_consultation = any(k in msg_lower for k in [
+            "dó menor", "do menor", "dó maior", "do maior", "ré menor", "re menor",
+            "mi menor", "sol menor", "la menor", "lá menor", "acorde", "acordes",
+            "tonalidade", "tocar uma musica", "tocar uma música", "o que eu uso",
+            "oq eu uso", "qual instrumento usar", "para tocar", "começar a tocar",
+            "iniciante", "primeiro instrumento", "aprender a tocar", "diferença entre aço e nylon",
+            "aço ou nylon", "violão ou teclado", "guitarra ou violão",
+        ])
+
+        if is_musical_consultation:
+            # Question about Dó menor / key / chords
+            if any(k in msg_lower for k in ["dó menor", "do menor", "tocar uma musica", "tocar uma música", "oq eu uso", "o que eu uso"]):
+                return (
+                    "Dó menor (Cm) é uma tonalidade linda, expressiva e marcante! Para tocar uma música nessa tonalidade, "
+                    "você tem excelentes opções de instrumentos aqui na loja, dependendo do estilo que você quer fazer:\n\n"
+                    "1. No Violão ou Guitarra:\n"
+                    "O acorde de Dó menor é feito com uma pestana na 3ª casa (com o formato de Lá menor). "
+                    "Se você prefere cordas macias para dedilhar com conforto, recomendo nossos violões de nylon como o Tagima Memphis AC-39 (R$ 429,90). "
+                    "Se prefere o timbre brilhante e encorpado do aço, o Shelby SN-100 Folk (R$ 549,00) tem braço fino de 43mm que facilita muito a montagem de pestanas!\n\n"
+                    "2. No Teclado ou Piano:\n"
+                    "O acorde de Dó menor é formado pelas notas Dó, Mi bemol e Sol (C - Eb - G). No teclado é super visual e confortável de tocar e harmonizar.\n\n"
+                    "3. No Ukulele:\n"
+                    "Dó menor no ukulele é bem simples: basta fazer uma pequena pestana na 3ª casa nas cordas Lá, Mi e Dó (segurando as 3 primeiras cordas)! Temos ukuleles a partir de R$ 159,90.\n\n"
+                    "Você já toca algum desses instrumentos ou está escolhendo o seu primeiro para começar?"
+                )
+
+            if any(k in msg_lower for k in ["iniciante", "primeiro instrumento", "aprender a tocar", "começar"]):
+                return (
+                    "Que excelente decisão! Para quem está dando os primeiros passos na música, temos três caminhos ideais:\n\n"
+                    "• Violão de Nylon (ex: Tagima Memphis AC-39 por R$ 429,90 ou Yamaha C40 por R$ 599,90): as cordas de nylon são as mais macias para os dedos e não machucam no início do aprendizado.\n"
+                    "• Ukulele (a partir de R$ 159,90): tem apenas 4 cordas, corpo leve e acordes rápidos de aprender, ótimo para quem quer tocar as primeiras músicas já na primeira semana.\n"
+                    "• Teclado: excelente para aprender teoria musical e percepção harmônica de forma visual.\n\n"
+                    "Qual estilo de música você mais gosta de ouvir e sonha em tocar?"
+                )
+
+            if any(k in msg_lower for k in ["aço e nylon", "nylon e aço", "aço ou nylon", "nylon ou aço"]):
+                return (
+                    "Essa é uma das dúvidas mais clássicas! A diferença principal é:\n\n"
+                    "• Violão de Nylon: tem timbre mais aveludado, encorpado e macio. As cordas são mais suaves ao toque, sendo perfeitas para MPB, bossa nova, clássico, samba e para quem está iniciando.\n"
+                    "• Violão de Aço: tem som brilhante, alto e metálico. O braço é mais estreito (geralmente 43mm), perfeito para pop, rock, sertanejo e folk.\n\n"
+                    "Nós temos ambos em estoque prontos para teste! Você tem preferência por algum estilo musical?"
+                )
+
+        # ----------------------------------------------------------------------
+        # INTENT 1: Order Tracking
         # ----------------------------------------------------------------------
         tracking_match = re.search(r"BR[A-Z0-9]{9}BR", msg, re.IGNORECASE)
         has_order_intent = any(k in msg_lower for k in ["rastre", "meu pedido", "onde está meu pedido", "status do pedido"])
@@ -301,8 +349,7 @@ class EmporioAgent:
                 return f"Não encontrei nenhum pedido com o código de rastreamento {tr_code}. Poderia confirmar os dígitos?"
 
         # ----------------------------------------------------------------------
-        # INTENT 2: Store Policies (Address, Hours, Returns under CDC, Payment terms)
-        # Must require explicit customer-service intent, NOT accidental words!
+        # INTENT 2: Store Policies (Address, Hours, Returns under CDC, Payment)
         # ----------------------------------------------------------------------
         is_address_query = any(k in msg_lower for k in ["endereço", "endereco", "onde fica a loja", "onde fica", "onde estão"])
         is_hours_query = any(k in msg_lower for k in ["horário", "horario", "que horas abre", "abre no sábado", "funciona no sábado", "fecha"])
@@ -347,11 +394,12 @@ class EmporioAgent:
             )
 
         # ----------------------------------------------------------------------
-        # INTENT 3: Specific Product Pricing / Availability (e.g., Takamine GD20)
+        # INTENT 3: Specific Product Pricing / Availability (e.g. Takamine GD20)
         # ----------------------------------------------------------------------
         known_products = [
-            "takamine gd20", "takamine", "fender", "yamaha c40", "yamaha c70",
-            "yamaha f310", "yamaha", "tagima memphis", "tagima dallas", "tagima",
+            "takamine gd20", "takamine gc5ce", "takamine", "fender",
+            "yamaha c40", "yamaha c70", "yamaha f310", "yamaha",
+            "tagima memphis", "tagima dallas", "tagima",
             "giannini gf-1r", "giannini", "ibanez", "crafter", "shelby",
         ]
         matched_product = None
@@ -412,9 +460,7 @@ class EmporioAgent:
 
         # ----------------------------------------------------------------------
         # INTENT 4: Instrument Catalog Query (Discovery / Spec Refinement)
-        # Must verify real instrument shopping intent!
         # ----------------------------------------------------------------------
-        # Update category context if a category was actually requested
         if "viol" in msg_lower:
             self.session_state["last_category"] = "Violões"
         elif "guitarra" in msg_lower:
@@ -442,7 +488,6 @@ class EmporioAgent:
             except ValueError:
                 pass
 
-        # Real shopping / browsing intent triggers
         catalog_intent_triggers = [
             "quais modelos", "quais viol", "quais guitarra", "quais instrumentos", "opções de", "opcoes de",
             "tem de até", "tem ate", "tem violão", "tem guitarra", "recomenda", "estou procurando",
@@ -457,7 +502,6 @@ class EmporioAgent:
             target_cat = current_category or "Violões"
             self.session_state["last_category"] = target_cat
 
-            # Special case: Steel string guitar under R$ 500
             if wants_steel and max_price and max_price <= 500:
                 cheapest_steel = json.loads(execute_tool("search_catalog", {
                     "category": "Violões",
@@ -497,7 +541,6 @@ class EmporioAgent:
                         f"ele entrega exatamente o timbre brilhante do aço e a tocabilidade de 43mm que você procura. Quer que eu separe um para você testar?"
                     )
 
-            # Standard catalog query
             string_filter = "aço" if wants_steel else ("nylon" if wants_nylon else None)
             catalog_data = json.loads(execute_tool("search_catalog", {
                 "category": target_cat,
@@ -535,7 +578,7 @@ class EmporioAgent:
                 return "\n".join(resp_lines)
 
         # ----------------------------------------------------------------------
-        # DEFAULT: Greetings or Unrecognized / Out of Scope Inquiries
+        # DEFAULT: Greetings or Friendly General Assistance
         # ----------------------------------------------------------------------
         is_greeting = any(g in msg_lower for g in ["olá", "ola", "bom dia", "boa tarde", "boa noite", "oi", "opa"])
         if is_greeting:
@@ -547,6 +590,9 @@ class EmporioAgent:
                 "Qual instrumento você gostaria de conhecer hoje?"
             )
 
-        # If it wasn't a greeting and didn't match legitimate store intents:
-        # Return the clean out-of-scope reply!
-        return OUT_OF_SCOPE_STANDARD_REPLY
+        # Natural, polite fallback without mentioning technical systems
+        return (
+            "Olá! Como assistente da Empório da Música, meu foco é tirar dúvidas sobre nossos instrumentos musicais, "
+            "acompanhar pedidos, consultar preços e explicar nossas políticas da loja.\n\n"
+            "Posso te ajudar a encontrar algum instrumento ou modelo específico para o seu som?"
+        )
